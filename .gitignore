@@ -1,0 +1,10 @@
+.DS_Store
+__pycache__/
+*.pyc
+.env
+.venv/
+venv/
+logs/
+backend/static/renders/
+backend/static/images
+backend/static/videos

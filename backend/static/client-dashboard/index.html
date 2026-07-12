@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Rumbo | Tienda Canela</title>
+    <script>
+      if (window.location.protocol === "file:") {
+        window.location.replace("http://localhost:8000/client-dashboard");
+      }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/static/client-dashboard/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <span class="brand-mark"></span>
+          <div>
+            <strong>Rumbo</strong>
+            <span>Tienda Canela</span>
+          </div>
+        </div>
+        <nav class="side-nav" aria-label="Módulos">
+          <button class="nav-item active" data-module="meta">Meta Ads</button>
+          <button class="nav-item" data-module="creators">Creadoras</button>
+          <button class="nav-item" data-module="business">Negocio</button>
+        </nav>
+        <div class="read-only">Solo lectura</div>
+      </aside>
+
+      <main class="content">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Cliente</p>
+            <h1>Dashboard Tienda Canela</h1>
+          </div>
+          <div class="range-controls" aria-label="Rango de fechas">
+            <div class="segmented">
+              <button class="range-button active" data-range="7d">7d</button>
+              <button class="range-button" data-range="14d">14d</button>
+              <button class="range-button" data-range="30d">30d</button>
+              <button class="range-button" data-range="custom">Custom</button>
+            </div>
+            <div class="custom-range" hidden>
+              <input type="date" id="since" />
+              <input type="date" id="until" />
+              <button id="applyCustom">Aplicar</button>
+            </div>
+          </div>
+        </header>
+
+        <section class="status-row">
+          <span id="rangeLabel">Cargando datos...</span>
+          <span id="cacheLabel"></span>
+        </section>
+
+        <section id="kpis" class="kpi-grid" aria-label="KPIs"></section>
+
+        <section class="grid two module-section" data-module-section="meta">
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">ROAS</p>
+                <h2>ROAS por día</h2>
+              </div>
+              <span id="roasTarget" class="target-label"></span>
+            </div>
+            <div id="roasChart" class="chart"></div>
+          </article>
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Ventas</p>
+                <h2>Compras por día</h2>
+              </div>
+            </div>
+            <div id="purchaseChart" class="chart"></div>
+          </article>
+        </section>
+
+        <section class="grid funnel-layout module-section" data-module-section="meta">
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Funnel</p>
+                <h2>Visita a compra</h2>
+              </div>
+            </div>
+            <div id="funnel" class="funnel"></div>
+          </article>
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Creativos</p>
+                <h2>Imagen vs video</h2>
+              </div>
+            </div>
+            <div id="formatDistribution" class="format-bars"></div>
+          </article>
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Concentración</p>
+                <h2>Pareto de ingresos</h2>
+              </div>
+            </div>
+            <p id="paretoText" class="big-note"></p>
+          </article>
+        </section>
+
+        <section class="grid two module-section" data-module-section="meta">
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Ads creatives</p>
+                <h2>Top 10 por valor de compras</h2>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Ad</th>
+                    <th>Adset</th>
+                    <th class="num">Compras</th>
+                    <th class="num">ROAS</th>
+                    <th class="num">Ingresos</th>
+                    <th class="num">CTR</th>
+                  </tr>
+                </thead>
+                <tbody id="topAds"></tbody>
+              </table>
+            </div>
+          </article>
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Cambios</p>
+                <h2>Últimos ads creados</h2>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Ad</th>
+                    <th>Adset</th>
+                    <th>Estado</th>
+                    <th>Creado</th>
+                  </tr>
+                </thead>
+                <tbody id="recentChanges"></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
+        <section class="grid two module-section" data-module-section="meta">
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Fatiga</p>
+                <h2>Señales de fatiga</h2>
+              </div>
+            </div>
+            <div id="fatigueSignals" class="signal-list"></div>
+          </article>
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Marca</p>
+                <h2>Engagement social</h2>
+              </div>
+            </div>
+            <div id="engagement" class="mini-metrics"></div>
+          </article>
+        </section>
+
+        <section class="grid two module-section" data-module-section="creators" hidden>
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Beboteo</p>
+                <h2>Top 5 por ventas</h2>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Creadora</th><th class="num">Ads</th><th class="num">Compras</th><th class="num">ROAS</th><th class="num">Ingresos</th></tr>
+                </thead>
+                <tbody id="topBeboteo"></tbody>
+              </table>
+            </div>
+          </article>
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Narrado</p>
+                <h2>Top 5 por ventas</h2>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Creadora</th><th class="num">Ads</th><th class="num">Compras</th><th class="num">ROAS</th><th class="num">Ingresos</th></tr>
+                </thead>
+                <tbody id="topNarrado"></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
+        <section class="grid two module-section" data-module-section="creators" hidden>
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">General</p>
+                <h2>Top 5 por volumen</h2>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Creadora</th><th class="num">Ads</th><th class="num">Compras</th><th class="num">ROAS</th><th class="num">Ingresos</th></tr>
+                </thead>
+                <tbody id="topGeneralCreators"></tbody>
+              </table>
+            </div>
+          </article>
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Productos</p>
+                <h2>Top 5 por unidades</h2>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Producto</th><th class="num">Ads</th><th class="num">Compras</th><th class="num">ROAS</th><th class="num">Ingresos</th></tr>
+                </thead>
+                <tbody id="topProducts"></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
+        <section class="grid two module-section" data-module-section="creators" hidden>
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Participación</p>
+                <h2>Todas las creadoras activas</h2>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Creadora</th><th class="num">Ads</th><th class="num">Part.</th><th class="num">Compras</th><th class="num">ROAS</th></tr>
+                </thead>
+                <tbody id="creatorsTable"></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
+        <section class="grid two module-section" data-module-section="creators" hidden>
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Normalización</p>
+                <h2>Creadoras detectadas</h2>
+              </div>
+            </div>
+            <div id="detectedCreators" class="tag-list"></div>
+          </article>
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">A revisar</p>
+                <h2>Ads sin clasificar</h2>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Ad</th><th>Adset</th><th>Campaña</th><th>Motivo</th></tr>
+                </thead>
+                <tbody id="unclassifiedAds"></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
+        <section class="grid two module-section" data-module-section="business" hidden>
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Facturación</p>
+                <h2>Facturación por día</h2>
+              </div>
+            </div>
+            <div id="revenueChart" class="chart"></div>
+          </article>
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Órdenes</p>
+                <h2>Órdenes por día</h2>
+              </div>
+            </div>
+            <div id="ordersChart" class="chart"></div>
+          </article>
+        </section>
+
+        <section class="grid two module-section" data-module-section="business" hidden>
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Ventas</p>
+                <h2>Últimas órdenes</h2>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Número</th>
+                    <th>Fecha</th>
+                    <th>Cliente</th>
+                    <th class="num">Total</th>
+                    <th>Pago</th>
+                    <th>Cupón</th>
+                  </tr>
+                </thead>
+                <tbody id="latestOrders"></tbody>
+              </table>
+            </div>
+          </article>
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Pagos</p>
+                <h2>Estados de pago</h2>
+              </div>
+            </div>
+            <div id="paymentStatus" class="signal-list"></div>
+          </article>
+        </section>
+
+        <section class="grid two module-section" data-module-section="business" hidden>
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Productos</p>
+                <h2>Top por unidades</h2>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Producto</th><th class="num">Unidades</th><th class="num">Facturación</th></tr>
+                </thead>
+                <tbody id="businessProductsUnits"></tbody>
+              </table>
+            </div>
+          </article>
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Productos</p>
+                <h2>Top por facturación</h2>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Producto</th><th class="num">Unidades</th><th class="num">Facturación</th></tr>
+                </thead>
+                <tbody id="businessProductsRevenue"></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
+        <section class="grid two module-section" data-module-section="business" hidden>
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Clientes</p>
+                <h2>Nuevos vs recurrentes</h2>
+              </div>
+            </div>
+            <div id="businessCustomers" class="mini-metrics"></div>
+          </article>
+        </section>
+      </main>
+    </div>
+
+    <script src="/static/client-dashboard/app.js"></script>
+  </body>
+</html>
