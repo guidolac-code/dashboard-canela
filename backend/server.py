@@ -959,20 +959,7 @@ async def list_accounts():
         # Ensure active field is always present
         if "active" not in acc:
             acc["active"] = False
-        acc["active_source"] = "notion" if os.environ.get("NOTION_TOKEN") else "mongo_legacy_read_only"
-    if os.environ.get("NOTION_TOKEN"):
-        from ads_queue import NotionQueueClient
-        try:
-            clients = await NotionQueueClient().clients()
-            status_by_account = {
-                row.get("Ad Account ID", ""): row.get("Status") == "Activo"
-                for row in clients
-                if row.get("Ad Account ID")
-            }
-            for acc in accounts:
-                acc["active"] = status_by_account.get(acc.get("meta_account_id"), False)
-        except Exception as exc:
-            raise HTTPException(status_code=503, detail=f"No se pudo leer Clientes de Notion: {exc}") from exc
+        acc["active_source"] = "mongo"
     return accounts
 
 
@@ -2730,16 +2717,7 @@ async def update_reports_config(config: ReportsConfigUpdate):
     )
     return {"message": "Configuración de Reportes actualizada"}
 
-# Include the routers
-from uploader import uploader_router, set_db as uploader_set_db, init_advantage_features
-from ads_queue import ads_queue_router, set_db as ads_queue_set_db
-
-uploader_set_db(db)
-ads_queue_set_db(db)
-
 app.include_router(api_router)
-app.include_router(uploader_router)
-app.include_router(ads_queue_router)
 app.include_router(tiendanube_router)
 
 import os
@@ -2958,8 +2936,6 @@ async def startup_event():
         else:
             logger.info(f"Database already has {count} accounts")
 
-        # Seed advantage_features config in MongoDB (evergreen feature list)
-        await init_advantage_features()
         await db.tiendanube_connections.create_index("store_id", unique=True)
 
     except Exception as e:
