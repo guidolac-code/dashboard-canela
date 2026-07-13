@@ -11,6 +11,7 @@ from pathlib import Path
 from pydantic import BaseModel, ConfigDict
 from typing import List, Optional
 from datetime import datetime, timezone, timedelta
+from zoneinfo import ZoneInfo
 import asyncio
 import re
 import unicodedata
@@ -1576,7 +1577,7 @@ def _date_from_iso(value: str):
 
 
 def _client_dashboard_range(range_key: str, since: Optional[str], until: Optional[str]):
-    today = datetime.now(timezone.utc).date()
+    today = datetime.now(ZoneInfo("America/Argentina/Buenos_Aires")).date()
     if range_key == "custom":
         if not since or not until:
             raise HTTPException(status_code=400, detail="Custom requiere since y until.")
@@ -1584,10 +1585,16 @@ def _client_dashboard_range(range_key: str, since: Optional[str], until: Optiona
         end = _date_from_iso(until)
         if end < start:
             raise HTTPException(status_code=400, detail="until no puede ser anterior a since.")
+    elif range_key == "today":
+        start = today
+        end = today
+    elif range_key == "yesterday":
+        start = today - timedelta(days=1)
+        end = start
     else:
         days_map = {"7d": 7, "14d": 14, "30d": 30}
         if range_key not in days_map:
-            raise HTTPException(status_code=400, detail="Rango inválido. Usá 7d, 14d, 30d o custom.")
+            raise HTTPException(status_code=400, detail="Rango inválido. Usá today, yesterday, 7d, 14d, 30d o custom.")
         days = days_map[range_key]
         end = today
         start = today - timedelta(days=days - 1)
@@ -1809,7 +1816,7 @@ def _funnel(metrics):
 @api_router.get("/client-dashboard/meta")
 async def get_client_meta_dashboard(
     account_id: str = CLIENT_DASHBOARD_DEFAULT_ACCOUNT,
-    range: str = Query("7d", pattern="^(7d|14d|30d|custom)$"),
+    range: str = Query("7d", pattern="^(today|yesterday|7d|14d|30d|custom)$"),
     since: Optional[str] = None,
     until: Optional[str] = None,
 ):
@@ -2223,7 +2230,7 @@ def _forgotten_creators(rows):
 @api_router.get("/client-dashboard/creators")
 async def get_client_creators_dashboard(
     account_id: str = CLIENT_DASHBOARD_DEFAULT_ACCOUNT,
-    range: str = Query("30d", pattern="^(7d|14d|30d|custom)$"),
+    range: str = Query("30d", pattern="^(today|yesterday|7d|14d|30d|custom)$"),
     since: Optional[str] = None,
     until: Optional[str] = None,
 ):
@@ -2520,7 +2527,7 @@ def _aggregate_business_orders(current_orders, all_orders, ranges):
 
 @api_router.get("/client-dashboard/business")
 async def get_client_business_dashboard(
-    range: str = Query("7d", pattern="^(7d|14d|30d|custom)$"),
+    range: str = Query("7d", pattern="^(today|yesterday|7d|14d|30d|custom)$"),
     since: Optional[str] = None,
     until: Optional[str] = None,
 ):

@@ -46,6 +46,21 @@ function pointsForLine(values, width, height, pad, maxOverride) {
     .join(" ");
 }
 
+function formatAxisValue(value, format) {
+  if (format === "currency") {
+    if (Math.abs(value) >= 1000000) return `$${fmtDecimal.format(value / 1000000)}M`;
+    if (Math.abs(value) >= 1000) return `$${fmtDecimal.format(value / 1000)}k`;
+    return `$${fmtNumber.format(value)}`;
+  }
+  if (format === "ratio") return fmtDecimal.format(value);
+  return fmtNumber.format(value);
+}
+
+function chartTicks(max, count = 4) {
+  const safeMax = Math.max(Number(max || 0), 1);
+  return Array.from({ length: count }, (_, index) => safeMax - (safeMax / (count - 1)) * index);
+}
+
 function renderSparkline(series, key, target) {
   const values = series.map((row) => Number(row[key] || 0));
   if (!values.length) return "";
@@ -79,46 +94,91 @@ function renderKpis(data) {
 function renderLineChart(el, series, key, options = {}) {
   const width = 700;
   const height = 250;
-  const pad = 28;
+  const padX = 58;
+  const padRight = 18;
+  const padY = 28;
   const values = series.map((row) => Number(row[key] || 0));
   const target = options.target || 0;
+  const format = options.format || "number";
   const max = Math.max(...values, target, 1);
-  const points = pointsForLine(values, width, height, pad, max);
-  const targetY = height - pad - (target / max) * (height - pad * 2);
+  const plotWidth = width - padX - padRight;
+  const plotHeight = height - padY * 2;
+  const step = values.length > 1 ? plotWidth / (values.length - 1) : 0;
+  const points = values
+    .map((value, index) => {
+      const x = padX + index * step;
+      const y = height - padY - (value / max) * plotHeight;
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
+  const targetY = height - padY - (target / max) * plotHeight;
+  const grid = chartTicks(max)
+    .map((tick) => {
+      const y = height - padY - (tick / max) * plotHeight;
+      return `<g>
+        <line x1="${padX}" y1="${y}" x2="${width - padRight}" y2="${y}" stroke="#1d2127" />
+        <text x="${padX - 10}" y="${y + 4}" text-anchor="end">${formatAxisValue(tick, format)}</text>
+      </g>`;
+    })
+    .join("");
   const labels = series
     .map((row, index) => {
       if (index !== 0 && index !== series.length - 1) return "";
-      const x = pad + (series.length > 1 ? index * ((width - pad * 2) / (series.length - 1)) : 0);
+      const x = padX + (series.length > 1 ? index * step : 0);
       return `<text x="${x}" y="${height - 6}" text-anchor="${index === 0 ? "start" : "end"}">${row.date.slice(5)}</text>`;
     })
     .join("");
 
   el.innerHTML = `<svg viewBox="0 0 ${width} ${height}" role="img">
-    <line x1="${pad}" y1="${height - pad}" x2="${width - pad}" y2="${height - pad}" stroke="#24272d" />
-    ${target ? `<line x1="${pad}" y1="${targetY}" x2="${width - pad}" y2="${targetY}" stroke="#3ddc84" stroke-dasharray="4 5" />` : ""}
+    <g fill="#69717c" font-size="11">${grid}</g>
+    <line x1="${padX}" y1="${height - padY}" x2="${width - padRight}" y2="${height - padY}" stroke="#24272d" />
+    ${target ? `<line x1="${padX}" y1="${targetY}" x2="${width - padRight}" y2="${targetY}" stroke="#3ddc84" stroke-dasharray="4 5" />` : ""}
     <polyline points="${points}" fill="none" stroke="#6da8ff" stroke-width="2" vector-effect="non-scaling-stroke" />
     <g fill="#5d6570" font-size="11">${labels}</g>
   </svg>`;
 }
 
-function renderBarChart(el, series, key) {
+function renderBarChart(el, series, key, options = {}) {
   const width = 700;
   const height = 250;
-  const pad = 28;
+  const padX = 58;
+  const padRight = 18;
+  const padY = 28;
   const values = series.map((row) => Number(row[key] || 0));
+  const format = options.format || "number";
   const max = Math.max(...values, 1);
-  const slot = (width - pad * 2) / Math.max(values.length, 1);
+  const plotWidth = width - padX - padRight;
+  const plotHeight = height - padY * 2;
+  const slot = plotWidth / Math.max(values.length, 1);
+  const grid = chartTicks(max)
+    .map((tick) => {
+      const y = height - padY - (tick / max) * plotHeight;
+      return `<g>
+        <line x1="${padX}" y1="${y}" x2="${width - padRight}" y2="${y}" stroke="#1d2127" />
+        <text x="${padX - 10}" y="${y + 4}" text-anchor="end">${formatAxisValue(tick, format)}</text>
+      </g>`;
+    })
+    .join("");
   const bars = values
     .map((value, index) => {
-      const barHeight = (value / max) * (height - pad * 2);
-      const x = pad + index * slot + slot * 0.18;
-      const y = height - pad - barHeight;
+      const barHeight = (value / max) * plotHeight;
+      const x = padX + index * slot + slot * 0.18;
+      const y = height - padY - barHeight;
       return `<rect x="${x}" y="${y}" width="${Math.max(slot * 0.64, 4)}" height="${barHeight}" rx="3" fill="#6da8ff" />`;
     })
     .join("");
+  const labels = series
+    .map((row, index) => {
+      if (index !== 0 && index !== series.length - 1) return "";
+      const x = padX + index * slot + slot * 0.5;
+      return `<text x="${x}" y="${height - 6}" text-anchor="middle">${row.date.slice(5)}</text>`;
+    })
+    .join("");
   el.innerHTML = `<svg viewBox="0 0 ${width} ${height}" role="img">
-    <line x1="${pad}" y1="${height - pad}" x2="${width - pad}" y2="${height - pad}" stroke="#24272d" />
+    <g fill="#69717c" font-size="11">${grid}</g>
+    <line x1="${padX}" y1="${height - padY}" x2="${width - padRight}" y2="${height - padY}" stroke="#24272d" />
     ${bars}
+    <g fill="#5d6570" font-size="11">${labels}</g>
   </svg>`;
 }
 
@@ -231,6 +291,12 @@ function updateRangeControlsForModule(module) {
   controls.hidden = module === "creators";
 }
 
+function setLoading(isLoading) {
+  const overlay = document.getElementById("loadingOverlay");
+  overlay.hidden = !isLoading;
+  document.querySelector(".content").classList.toggle("is-loading", isLoading);
+}
+
 function renderMeta(data) {
   state.data = data;
   setModuleSections("meta");
@@ -239,7 +305,7 @@ function renderMeta(data) {
   document.getElementById("cacheLabel").textContent = data.cached_at ? `Actualizado ${new Date(data.cached_at).toLocaleString("es-AR")}` : "";
   document.getElementById("roasTarget").textContent = data.account.roas_objetivo ? `Objetivo ${fmtDecimal.format(data.account.roas_objetivo)}` : "Sin objetivo";
   renderKpis(data);
-  renderLineChart(document.getElementById("roasChart"), data.series, "roas", { target: data.account.roas_objetivo || 0 });
+  renderLineChart(document.getElementById("roasChart"), data.series, "roas", { target: data.account.roas_objetivo || 0, format: "ratio" });
   renderBarChart(document.getElementById("purchaseChart"), data.series, "purchases");
   renderFunnel(data);
   renderFormatDistribution(data);
@@ -375,7 +441,7 @@ function renderBusiness(data) {
   document.getElementById("rangeLabel").textContent = `${data.range.current.since} a ${data.range.current.until}`;
   document.getElementById("cacheLabel").textContent = data.cached_at ? `Actualizado ${new Date(data.cached_at).toLocaleString("es-AR")}` : "";
   renderKpis(data);
-  renderBarChart(document.getElementById("revenueChart"), data.series, "revenue");
+  renderBarChart(document.getElementById("revenueChart"), data.series, "revenue", { format: "currency" });
   renderBarChart(document.getElementById("ordersChart"), data.series, "orders");
   renderLatestOrders(data.latest_orders);
   renderPaymentStatus(data.payment_status);
@@ -390,17 +456,22 @@ async function loadDashboard() {
     params.set("since", document.getElementById("since").value);
     params.set("until", document.getElementById("until").value);
   }
-  document.getElementById("rangeLabel").textContent = "Cargando datos...";
-  const endpoint = state.module === "creators" ? "creators" : state.module === "business" ? "business" : "meta";
-  const response = await fetch(`/api/client-dashboard/${endpoint}?${params.toString()}`);
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({}));
-    throw new Error(body.detail || "No se pudo cargar el dashboard.");
+  setLoading(true);
+  try {
+    document.getElementById("rangeLabel").textContent = "Cargando datos...";
+    const endpoint = state.module === "creators" ? "creators" : state.module === "business" ? "business" : "meta";
+    const response = await fetch(`/api/client-dashboard/${endpoint}?${params.toString()}`);
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.detail || "No se pudo cargar el dashboard.");
+    }
+    const data = await response.json();
+    if (state.module === "creators") renderCreators(data);
+    else if (state.module === "business") renderBusiness(data);
+    else renderMeta(data);
+  } finally {
+    setLoading(false);
   }
-  const data = await response.json();
-  if (state.module === "creators") renderCreators(data);
-  else if (state.module === "business") renderBusiness(data);
-  else renderMeta(data);
 }
 
 function setDefaultDates() {
@@ -416,20 +487,16 @@ function showError(error) {
   document.getElementById("kpis").innerHTML = "";
 }
 
-document.querySelectorAll(".range-button").forEach((button) => {
-  button.addEventListener("click", async () => {
-    document.querySelectorAll(".range-button").forEach((item) => item.classList.remove("active"));
-    button.classList.add("active");
-    state.range = button.dataset.range;
-    document.querySelector(".custom-range").hidden = state.range !== "custom";
-    if (state.range !== "custom") {
-      try {
-        await loadDashboard();
-      } catch (error) {
-        showError(error);
-      }
+document.getElementById("rangeSelect").addEventListener("change", async (event) => {
+  state.range = event.target.value;
+  document.querySelector(".custom-range").hidden = state.range !== "custom";
+  if (state.range !== "custom") {
+    try {
+      await loadDashboard();
+    } catch (error) {
+      showError(error);
     }
-  });
+  }
 });
 
 document.querySelectorAll(".nav-item:not(.disabled)").forEach((button) => {

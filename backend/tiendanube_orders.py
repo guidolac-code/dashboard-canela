@@ -242,6 +242,13 @@ class TiendanubeOrdersClient:
                     await asyncio.sleep(max(reset_ms / 1000, 0.5))
                     response = await client.get(next_url, headers=self.headers, params=request_params)
 
+                if (
+                    response.status_code == 404
+                    and page_count == 0
+                    and ("created_at_min" in request_params or "created_at_max" in request_params)
+                ):
+                    break
+
                 response.raise_for_status()
                 batch = response.json()
                 if not isinstance(batch, list):

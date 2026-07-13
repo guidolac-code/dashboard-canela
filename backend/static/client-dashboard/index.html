@@ -33,18 +33,30 @@
       </aside>
 
       <main class="content">
+        <div id="loadingOverlay" class="loading-overlay" hidden>
+          <div class="loading-card" role="status" aria-live="polite">
+            <span class="loading-spinner"></span>
+            <span>Cargando</span>
+          </div>
+        </div>
+
         <header class="topbar">
           <div>
             <p class="eyebrow">Cliente</p>
             <h1>Dashboard Tienda Canela</h1>
           </div>
           <div class="range-controls" aria-label="Rango de fechas">
-            <div class="segmented">
-              <button class="range-button active" data-range="7d">7d</button>
-              <button class="range-button" data-range="14d">14d</button>
-              <button class="range-button" data-range="30d">30d</button>
-              <button class="range-button" data-range="custom">Custom</button>
-            </div>
+            <label class="range-select-wrap" for="rangeSelect">
+              <span>Rango</span>
+              <select id="rangeSelect" class="range-select">
+                <option value="today">Hoy</option>
+                <option value="yesterday">Ayer</option>
+                <option value="7d" selected>Últimos 7 días</option>
+                <option value="14d">Últimos 14 días</option>
+                <option value="30d">Últimos 30 días</option>
+                <option value="custom">Personalizado</option>
+              </select>
+            </label>
             <div class="custom-range" hidden>
               <input type="date" id="since" />
               <input type="date" id="until" />

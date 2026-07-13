@@ -30,7 +30,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -121,8 +122,16 @@ input {
 }
 
 .content {
+  position: relative;
   min-width: 0;
   padding: 26px 30px 48px;
+}
+
+.content.is-loading > :not(.loading-overlay) {
+  filter: blur(1.2px);
+  opacity: 0.72;
+  pointer-events: none;
+  transition: opacity 120ms ease, filter 120ms ease;
 }
 
 .topbar {
@@ -163,30 +172,48 @@ h2 {
   justify-content: flex-end;
 }
 
-.segmented {
-  display: flex;
-  gap: 2px;
+.range-select-wrap {
+  min-width: 210px;
+  height: 38px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
   border: 1px solid var(--line);
   border-radius: 7px;
-  padding: 3px;
   background: var(--surface);
+  padding: 0 10px;
 }
 
-.range-button,
-.custom-range button {
-  height: 30px;
-  min-width: 44px;
-  border: 0;
-  border-radius: 5px;
-  background: transparent;
+.range-select-wrap span {
   color: var(--muted);
-  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
 }
 
-.range-button.active,
+.range-select {
+  min-width: 0;
+  height: 34px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  outline: 0;
+}
+
+.range-select option {
+  background: var(--surface);
+  color: var(--text);
+}
+
 .custom-range button {
+  height: 36px;
+  min-width: 70px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
   background: var(--surface-2);
   color: var(--text);
+  cursor: pointer;
 }
 
 .custom-range {
@@ -202,6 +229,48 @@ h2 {
   background: var(--surface);
   color: var(--text);
   padding: 0 8px;
+}
+
+.loading-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: start center;
+  padding-top: 120px;
+  background: rgba(11, 12, 14, 0.32);
+  backdrop-filter: blur(2px);
+}
+
+.loading-card {
+  min-width: 154px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(17, 19, 22, 0.92);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 16px 50px rgba(0, 0, 0, 0.34);
+}
+
+.loading-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid #2b3340;
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 650ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .status-row {
