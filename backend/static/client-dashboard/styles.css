@@ -35,6 +35,11 @@ select {
   font: inherit;
 }
 
+button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
 .app-shell {
   min-height: 100vh;
   display: grid;
@@ -229,6 +234,60 @@ h2 {
   background: var(--surface);
   color: var(--text);
   padding: 0 8px;
+}
+
+.settings-panel {
+  max-width: 520px;
+}
+
+.settings-form {
+  display: grid;
+  gap: 10px;
+}
+
+.settings-form label {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.settings-control {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.settings-control input {
+  width: 150px;
+  height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface-2);
+  color: var(--text);
+  padding: 0 10px;
+}
+
+.settings-control button {
+  height: 38px;
+  min-width: 92px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface-2);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.settings-hint,
+.settings-status {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.settings-status {
+  min-height: 18px;
+  color: var(--text);
 }
 
 .loading-overlay {

@@ -28,8 +28,9 @@
           <button class="nav-item active" data-module="meta">Meta Ads</button>
           <button class="nav-item" data-module="creators">Creadoras</button>
           <button class="nav-item" data-module="business">Negocio</button>
+          <button class="nav-item" data-module="settings">Configuración</button>
         </nav>
-        <div class="read-only">Solo lectura</div>
+        <div class="read-only">Datos solo lectura · configuración editable</div>
       </aside>
 
       <main class="content">
@@ -409,6 +410,27 @@
               </div>
             </div>
             <div id="businessCustomers" class="mini-metrics"></div>
+          </article>
+        </section>
+
+        <section class="grid two module-section" data-module-section="settings" hidden>
+          <article class="panel settings-panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Objetivos</p>
+                <h2>ROAS objetivo</h2>
+              </div>
+              <span id="settingsAccount" class="target-label"></span>
+            </div>
+            <form id="roasSettingsForm" class="settings-form">
+              <label for="roasObjectiveInput">ROAS mínimo rentable</label>
+              <div class="settings-control">
+                <input id="roasObjectiveInput" type="number" min="0.1" max="100" step="0.1" inputmode="decimal" required />
+                <button id="saveRoasObjective" type="submit">Guardar</button>
+              </div>
+              <p id="settingsHint" class="settings-hint">Se usa como línea objetivo en gráficos y como referencia para clasificar performance.</p>
+              <p id="settingsStatus" class="settings-status" role="status"></p>
+            </form>
           </article>
         </section>
       </main>

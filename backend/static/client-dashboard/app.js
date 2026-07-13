@@ -288,7 +288,7 @@ function setModuleSections(module) {
 
 function updateRangeControlsForModule(module) {
   const controls = document.querySelector(".range-controls");
-  controls.hidden = module === "creators";
+  controls.hidden = module === "creators" || module === "settings";
 }
 
 function setLoading(isLoading) {
@@ -450,6 +450,18 @@ function renderBusiness(data) {
   renderBusinessCustomers(data.customers);
 }
 
+function renderSettings() {
+  setModuleSections("settings");
+  updateRangeControlsForModule("settings");
+  const account = state.data?.account;
+  document.getElementById("rangeLabel").textContent = account ? "Configuración de cuenta" : "Cargando configuración...";
+  document.getElementById("cacheLabel").textContent = "";
+  document.getElementById("kpis").innerHTML = "";
+  document.getElementById("settingsAccount").textContent = account?.name || "";
+  document.getElementById("roasObjectiveInput").value = account?.roas_objetivo ?? "";
+  document.getElementById("settingsStatus").textContent = "";
+}
+
 async function loadDashboard() {
   const params = new URLSearchParams({ range: state.module === "creators" ? "30d" : state.range });
   if (state.module !== "creators" && state.range === "custom") {
@@ -471,6 +483,42 @@ async function loadDashboard() {
     else renderMeta(data);
   } finally {
     setLoading(false);
+  }
+}
+
+async function saveRoasObjective(event) {
+  event.preventDefault();
+  const account = state.data?.account;
+  const status = document.getElementById("settingsStatus");
+  const button = document.getElementById("saveRoasObjective");
+  const value = Number(document.getElementById("roasObjectiveInput").value);
+  if (!account?.id) {
+    status.textContent = "No se pudo identificar la cuenta.";
+    return;
+  }
+  if (!Number.isFinite(value) || value <= 0) {
+    status.textContent = "Ingresá un ROAS mayor a 0.";
+    return;
+  }
+
+  button.disabled = true;
+  status.textContent = "Guardando...";
+  try {
+    const response = await fetch(`/api/accounts/${encodeURIComponent(account.id)}/roas-objetivo`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ roas_objetivo: value }),
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.detail || "No se pudo guardar el ROAS objetivo.");
+    }
+    account.roas_objetivo = value;
+    status.textContent = `ROAS objetivo guardado: ${fmtDecimal.format(value)}`;
+  } catch (error) {
+    status.textContent = error.message;
+  } finally {
+    button.disabled = false;
   }
 }
 
@@ -503,6 +551,20 @@ document.querySelectorAll(".nav-item:not(.disabled)").forEach((button) => {
   button.addEventListener("click", async () => {
     state.module = button.dataset.module;
     setModuleSections(state.module);
+    if (state.module === "settings") {
+      if (!state.data?.account) {
+        state.module = "meta";
+        try {
+          await loadDashboard();
+        } catch (error) {
+          showError(error);
+          return;
+        }
+        state.module = "settings";
+      }
+      renderSettings();
+      return;
+    }
     try {
       await loadDashboard();
     } catch (error) {
@@ -518,6 +580,8 @@ document.getElementById("applyCustom").addEventListener("click", async () => {
     showError(error);
   }
 });
+
+document.getElementById("roasSettingsForm").addEventListener("submit", saveRoasObjective);
 
 setDefaultDates();
 loadDashboard().catch(showError);
