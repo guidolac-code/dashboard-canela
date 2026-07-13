@@ -23,7 +23,13 @@ from meta_api import (
     fetch_client_ad_insights, fetch_client_creator_active_structure,
 )
 from routers.tiendanube import configure_tiendanube_router, router as tiendanube_router
-from tiendanube_orders import TiendanubeConfigError, fetch_demo_orders
+from tiendanube_orders import (
+    DEFAULT_USER_AGENT,
+    TiendanubeConfigError,
+    TiendanubeOrdersClient,
+    get_tiendanube_demo_config,
+    summarize_order,
+)
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -2525,25 +2531,60 @@ def _aggregate_business_orders(current_orders, all_orders, ranges):
     }
 
 
+async def get_dashboard_tiendanube_config() -> tuple[dict[str, str], str]:
+    store_id = os.environ.get("TIENDANUBE_STORE_ID_DEMO")
+    query = {"store_id": str(store_id)} if store_id else {}
+    connection = await db.tiendanube_connections.find_one(
+        query,
+        {"_id": 0, "store_id": 1, "access_token": 1},
+        sort=[("updated_at", -1), ("connected_at", -1)],
+    )
+    if connection and connection.get("access_token") and connection.get("store_id"):
+        return {
+            "store_id": str(connection["store_id"]),
+            "access_token": connection["access_token"],
+            "user_agent": DEFAULT_USER_AGENT,
+        }, "oauth"
+
+    return get_tiendanube_demo_config(), "env_demo"
+
+
+async def fetch_dashboard_tiendanube_orders(
+    per_page: int = 30,
+    max_pages: int = 10,
+    params: Optional[dict[str, object]] = None,
+) -> dict[str, object]:
+    config, source = await get_dashboard_tiendanube_config()
+    client = TiendanubeOrdersClient(**config)
+    orders, metadata = await client.fetch_orders(per_page=per_page, max_pages=max_pages, params=params)
+    metadata["connection_source"] = source
+    summaries = [summarize_order(order) for order in orders]
+    return {
+        "metadata": metadata,
+        "orders": summaries,
+        "raw_orders": orders,
+    }
+
+
 @api_router.get("/client-dashboard/business")
 async def get_client_business_dashboard(
     range: str = Query("7d", pattern="^(today|yesterday|7d|14d|30d|custom)$"),
     since: Optional[str] = None,
     until: Optional[str] = None,
 ):
-    """Read-only business module using Tiendanube demo orders."""
+    """Read-only business module using Tiendanube orders."""
     ranges = _client_dashboard_range(range, since, until)
     created_at_min = f"{ranges['current']['since']}T00:00:00+00:00"
     created_at_max = f"{ranges['current']['until']}T23:59:59+00:00"
     period_key = f"{ranges['current']['since']}_{ranges['current']['until']}"
 
     try:
-        current = await fetch_demo_orders(
+        current = await fetch_dashboard_tiendanube_orders(
             per_page=200,
             max_pages=20,
             params={"created_at_min": created_at_min, "created_at_max": created_at_max, "status": "any"},
         )
-        all_data = await fetch_demo_orders(per_page=200, max_pages=100, params={"status": "any"})
+        all_data = await fetch_dashboard_tiendanube_orders(per_page=200, max_pages=100, params={"status": "any"})
     except TiendanubeConfigError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
     except Exception as exc:
