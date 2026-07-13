@@ -2,6 +2,7 @@ const state = {
   range: "7d",
   module: "meta",
   data: null,
+  metaData: null,
 };
 
 const fmtNumber = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 0 });
@@ -299,6 +300,7 @@ function setLoading(isLoading) {
 
 function renderMeta(data) {
   state.data = data;
+  state.metaData = data;
   setModuleSections("meta");
   updateRangeControlsForModule("meta");
   document.getElementById("rangeLabel").textContent = `${data.range.current.since} a ${data.range.current.until}`;
@@ -453,7 +455,7 @@ function renderBusiness(data) {
 function renderSettings() {
   setModuleSections("settings");
   updateRangeControlsForModule("settings");
-  const account = state.data?.account;
+  const account = state.metaData?.account;
   document.getElementById("rangeLabel").textContent = account ? "Configuración de cuenta" : "Cargando configuración...";
   document.getElementById("cacheLabel").textContent = "";
   document.getElementById("kpis").innerHTML = "";
@@ -463,6 +465,7 @@ function renderSettings() {
 }
 
 async function loadDashboard() {
+  const requestedModule = state.module;
   const params = new URLSearchParams({ range: state.module === "creators" ? "30d" : state.range });
   if (state.module !== "creators" && state.range === "custom") {
     params.set("since", document.getElementById("since").value);
@@ -478,9 +481,12 @@ async function loadDashboard() {
       throw new Error(body.detail || "No se pudo cargar el dashboard.");
     }
     const data = await response.json();
-    if (state.module === "creators") renderCreators(data);
-    else if (state.module === "business") renderBusiness(data);
+    if (requestedModule === "meta") state.metaData = data;
+    if (state.module !== requestedModule) return data;
+    if (requestedModule === "creators") renderCreators(data);
+    else if (requestedModule === "business") renderBusiness(data);
     else renderMeta(data);
+    return data;
   } finally {
     setLoading(false);
   }
@@ -552,7 +558,7 @@ document.querySelectorAll(".nav-item:not(.disabled)").forEach((button) => {
     state.module = button.dataset.module;
     setModuleSections(state.module);
     if (state.module === "settings") {
-      if (!state.data?.account) {
+      if (!state.metaData?.account) {
         state.module = "meta";
         try {
           await loadDashboard();
