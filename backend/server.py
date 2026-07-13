@@ -27,19 +27,23 @@ from tiendanube_orders import TiendanubeConfigError, fetch_demo_orders
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-# Validar variable MONGODB_URI
-if not os.environ.get("MONGO_URL"):
+MONGO_URL = os.environ.get("MONGO_URL") or os.environ.get("mongo_url")
+DB_NAME = os.environ.get("DB_NAME") or os.environ.get("db_name") or os.environ.get("mongo_db")
+
+if not MONGO_URL:
     raise ValueError("MONGO_URL environment variable is not set")
+if not DB_NAME:
+    raise ValueError("DB_NAME environment variable is not set")
 
 client = AsyncIOMotorClient(
-    os.environ["MONGO_URL"],
+    MONGO_URL,
     tls=True,
     tlsAllowInvalidCertificates=True,
     serverSelectionTimeoutMS=3000,
     connectTimeoutMS=3000,
     socketTimeoutMS=3000,
 )
-db = client[os.environ['DB_NAME']]
+db = client[DB_NAME]
 configure_tiendanube_router(db)
 
 app = FastAPI()
