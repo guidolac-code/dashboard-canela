@@ -14,7 +14,7 @@ from urllib.parse import parse_qs, urlparse
 import httpx
 from fastapi import APIRouter, HTTPException
 
-from google_integration_service import get_credentials, get_drive_service
+# DEPRECATED: google_integration_service removed (legacy feature)
 from slack_utils import send_slack_message
 from uploader import (
     META_API_BASE,
@@ -142,23 +142,13 @@ def extract_drive_file_id(url: str) -> Optional[str]:
 
 
 async def download_asset(url: str) -> tuple[bytes, str, str]:
+    """Download asset from URL. Google Drive downloads are no longer supported (legacy feature)."""
+    # DEPRECATED: Google Drive support removed
     file_id = extract_drive_file_id(url)
     if file_id:
-        creds = get_credentials()
-        if not creds:
-            raise QueueError("No hay credenciales de Google para descargar el asset")
+        raise QueueError("Google Drive downloads no longer supported (legacy feature removed)")
 
-        def _download():
-            service = get_drive_service(creds)
-            metadata = service.files().get(fileId=file_id, fields="name,mimeType").execute()
-            content = service.files().get_media(fileId=file_id).execute()
-            return content, metadata.get("name", file_id), metadata.get("mimeType", "")
-
-        try:
-            return await asyncio.to_thread(_download)
-        except Exception as exc:
-            raise QueueError(f"No se pudo descargar el asset de Drive: {exc}") from exc
-
+    # HTTP download only
     async with httpx.AsyncClient(follow_redirects=True, timeout=60) as client:
         response = await client.get(url)
     if response.status_code >= 400:
