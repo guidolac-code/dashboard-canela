@@ -9,9 +9,6 @@
         window.location.replace("http://localhost:8000/client-dashboard");
       }
     </script>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/static/client-dashboard/styles.css" />
   </head>
   <body>
@@ -30,6 +27,9 @@
           <button class="nav-item" data-module="business">Negocio</button>
           <button class="nav-item" data-module="settings">Configuración</button>
         </nav>
+        <form method="post" action="/client-dashboard/logout">
+          <button class="logout-button" type="submit">Cerrar sesión</button>
+        </form>
         <div class="read-only">Datos solo lectura · configuración editable</div>
       </aside>
 

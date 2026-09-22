@@ -117,6 +117,24 @@ button:disabled {
   cursor: default;
 }
 
+.logout-button {
+  width: 100%;
+  height: 34px;
+  margin-top: 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  text-align: left;
+  padding: 0 10px;
+  cursor: pointer;
+}
+
+.logout-button:hover {
+  color: var(--text);
+  border-color: var(--muted-2);
+}
+
 .read-only {
   margin-top: auto;
   border: 1px solid var(--line);

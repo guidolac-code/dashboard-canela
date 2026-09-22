@@ -27,3 +27,14 @@ Variables mínimas:
 - `TIENDANUBE_CLIENT_ID`
 - `TIENDANUBE_CLIENT_SECRET`
 - Meta API settings/tokens según el entorno de Rumbo.
+
+Variables de acceso del dashboard público:
+
+- `CLIENT_DASHBOARD_USERNAME`
+- `CLIENT_DASHBOARD_PASSWORD_HASH` (PBKDF2; nunca guardar la contraseña en texto plano)
+- `CLIENT_DASHBOARD_SESSION_SECRET` (mínimo 32 caracteres aleatorios)
+- `CLIENT_DASHBOARD_ALLOWED_ORIGINS` (opcional; por defecto usa el dominio Railway)
+
+El deployment público queda limitado a las rutas del dashboard de Tienda Canela.
+Las rutas administrativas, tokens, Slack, documentación OpenAPI y cuentas de otros
+clientes no son accesibles desde este servicio.

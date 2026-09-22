@@ -1,6 +1,6 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Query
+from fastapi import FastAPI, APIRouter, Form, HTTPException, Query, Request
 from fastapi.staticfiles import StaticFiles
-from starlette.responses import FileResponse, JSONResponse, RedirectResponse
+from starlette.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 import httpx
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -13,9 +13,19 @@ from typing import List, Optional
 from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo
 import asyncio
+import html
 import re
+import secrets
 import unicodedata
 from difflib import SequenceMatcher
+
+from client_auth import (
+    auth_config,
+    auth_is_configured,
+    create_session_token,
+    verify_password,
+    verify_session_token,
+)
 
 from meta_api import (
     fetch_account_data, fetch_account_data_custom, fetch_ads_lifetime_insights,
@@ -1573,6 +1583,11 @@ async def get_dashboard(account_id: str, period: int = 30, include_paused: bool 
 
 
 CLIENT_DASHBOARD_DEFAULT_ACCOUNT = "act_2699461910320121"
+CLIENT_SESSION_COOKIE = "canela_session"
+CLIENT_SESSION_TTL_SECONDS = 60 * 60 * 24 * 30
+CLIENT_LOGIN_ATTEMPTS: dict[str, list[float]] = {}
+CLIENT_LOGIN_WINDOW_SECONDS = 15 * 60
+CLIENT_LOGIN_MAX_ATTEMPTS = 6
 
 
 def _date_from_iso(value: str):
@@ -1821,12 +1836,12 @@ def _funnel(metrics):
 
 @api_router.get("/client-dashboard/meta")
 async def get_client_meta_dashboard(
-    account_id: str = CLIENT_DASHBOARD_DEFAULT_ACCOUNT,
     range: str = Query("7d", pattern="^(today|yesterday|7d|14d|30d|custom)$"),
     since: Optional[str] = None,
     until: Optional[str] = None,
 ):
     """Read-only client dashboard for Tienda Canela Meta Ads."""
+    account_id = CLIENT_DASHBOARD_DEFAULT_ACCOUNT
     account = await db.accounts.find_one({"id": account_id}, {"_id": 0})
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
@@ -2235,12 +2250,12 @@ def _forgotten_creators(rows):
 
 @api_router.get("/client-dashboard/creators")
 async def get_client_creators_dashboard(
-    account_id: str = CLIENT_DASHBOARD_DEFAULT_ACCOUNT,
     range: str = Query("30d", pattern="^(today|yesterday|7d|14d|30d|custom)$"),
     since: Optional[str] = None,
     until: Optional[str] = None,
 ):
     """Read-only Creators module for active Evergreen ads."""
+    account_id = CLIENT_DASHBOARD_DEFAULT_ACCOUNT
     account = await db.accounts.find_one({"id": account_id}, {"_id": 0})
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
@@ -2605,6 +2620,8 @@ async def get_client_business_dashboard(
 @api_router.put("/accounts/{account_id}/roas-objetivo")
 async def update_roas_objetivo(account_id: str, body: RoasObjetivoUpdate):
     """Update ROAS objetivo for an account."""
+    if account_id != CLIENT_DASHBOARD_DEFAULT_ACCOUNT:
+        raise HTTPException(status_code=404, detail="Account not found")
     result = await db.accounts.update_one(
         {"id": account_id},
         {"$set": {"roas_objetivo": body.roas_objetivo}}
@@ -2777,6 +2794,120 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR), follow_symlink=True)
 @app.get("/client-dashboard")
 async def client_dashboard_app():
     return FileResponse(STATIC_DIR / "client-dashboard" / "index.html")
+
+
+def _login_page(error: str = "", username: str = "") -> str:
+    error_html = f'<p class="error" role="alert">{html.escape(error)}</p>' if error else ""
+    return f"""<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Acceso | Tienda Canela</title>
+  <style>
+    :root {{ color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }}
+    * {{ box-sizing: border-box; }}
+    body {{ margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px;
+      background: radial-gradient(circle at top, #36281f 0, #171310 46%, #0d0b0a 100%); color: #f7f0e9; }}
+    main {{ width: min(100%, 420px); padding: 34px; border: 1px solid #594638; border-radius: 22px;
+      background: rgba(27,22,18,.94); box-shadow: 0 28px 80px rgba(0,0,0,.42); }}
+    .eyebrow {{ color: #cba67f; letter-spacing: .16em; text-transform: uppercase; font-size: 12px; }}
+    h1 {{ margin: 8px 0 6px; font-size: 30px; }}
+    p {{ color: #cbbeb3; margin: 0 0 24px; }}
+    label {{ display: block; margin: 16px 0 7px; font-size: 14px; color: #dfd3ca; }}
+    input {{ width: 100%; border: 1px solid #5e4d40; border-radius: 11px; padding: 13px 14px;
+      background: #100d0b; color: #fff; font: inherit; outline: none; }}
+    input:focus {{ border-color: #d2a877; box-shadow: 0 0 0 3px rgba(210,168,119,.16); }}
+    button {{ width: 100%; margin-top: 22px; padding: 13px; border: 0; border-radius: 11px;
+      background: #d2a877; color: #24170e; font: inherit; font-weight: 750; cursor: pointer; }}
+    .error {{ padding: 11px 13px; border-radius: 10px; background: #4a2020; color: #ffd8d8; margin: 14px 0; }}
+  </style>
+</head>
+<body><main>
+  <div class="eyebrow">Tienda Canela</div>
+  <h1>Dashboard</h1>
+  <p>Ingresá con tus credenciales para ver las métricas.</p>
+  {error_html}
+  <form method="post" action="/client-dashboard/login">
+    <label for="username">Usuario</label>
+    <input id="username" name="username" autocomplete="username" required value="{html.escape(username)}">
+    <label for="password">Contraseña</label>
+    <input id="password" name="password" type="password" autocomplete="current-password" required>
+    <button type="submit">Entrar</button>
+  </form>
+</main></body></html>"""
+
+
+def _client_is_authenticated(request: Request) -> bool:
+    username, _password_hash, session_secret = auth_config()
+    return verify_session_token(
+        request.cookies.get(CLIENT_SESSION_COOKIE, ""), session_secret, username
+    )
+
+
+def _login_is_rate_limited(request: Request) -> bool:
+    now = datetime.now(timezone.utc).timestamp()
+    address = request.client.host if request.client else "unknown"
+    attempts = [
+        timestamp
+        for timestamp in CLIENT_LOGIN_ATTEMPTS.get(address, [])
+        if now - timestamp < CLIENT_LOGIN_WINDOW_SECONDS
+    ]
+    CLIENT_LOGIN_ATTEMPTS[address] = attempts
+    return len(attempts) >= CLIENT_LOGIN_MAX_ATTEMPTS
+
+
+@app.get("/")
+async def public_root():
+    return RedirectResponse("/client-dashboard", status_code=302)
+
+
+@app.get("/client-dashboard/login", response_class=HTMLResponse)
+async def client_login_page(request: Request):
+    if _client_is_authenticated(request):
+        return RedirectResponse("/client-dashboard", status_code=303)
+    return HTMLResponse(_login_page())
+
+
+@app.post("/client-dashboard/login", response_class=HTMLResponse)
+async def client_login(request: Request, username: str = Form(...), password: str = Form(...)):
+    if not auth_is_configured():
+        return HTMLResponse(_login_page("El acceso todavía no está configurado."), status_code=503)
+    if _login_is_rate_limited(request):
+        return HTMLResponse(
+            _login_page("Demasiados intentos. Probá nuevamente en 15 minutos.", username),
+            status_code=429,
+        )
+
+    configured_username, password_hash, session_secret = auth_config()
+    username_ok = secrets.compare_digest(username.strip(), configured_username)
+    password_ok = verify_password(password, password_hash)
+    if not (username_ok and password_ok):
+        address = request.client.host if request.client else "unknown"
+        CLIENT_LOGIN_ATTEMPTS.setdefault(address, []).append(datetime.now(timezone.utc).timestamp())
+        return HTMLResponse(_login_page("Usuario o contraseña incorrectos.", username), status_code=401)
+
+    token = create_session_token(
+        configured_username, session_secret, ttl_seconds=CLIENT_SESSION_TTL_SECONDS
+    )
+    response = RedirectResponse("/client-dashboard", status_code=303)
+    response.set_cookie(
+        CLIENT_SESSION_COOKIE,
+        token,
+        max_age=CLIENT_SESSION_TTL_SECONDS,
+        httponly=True,
+        secure=os.environ.get("CLIENT_DASHBOARD_COOKIE_SECURE", "true").lower() != "false",
+        samesite="strict",
+        path="/",
+    )
+    return response
+
+
+@app.post("/client-dashboard/logout")
+async def client_logout():
+    response = RedirectResponse("/client-dashboard/login", status_code=303)
+    response.delete_cookie(CLIENT_SESSION_COOKIE, path="/")
+    return response
 
 # ─── OAuth / Auth router ───────────────────────────────────────────────────── 
 
@@ -2996,15 +3127,65 @@ async def startup_event():
 async def shutdown_db_client():
     client.close()
 
-# --- CORS Middleware (At the end to wrap everything) ---
-# FORCE WILDCARD for debugging - "Canilla Libre" mode
-print("DEBUG: Forcing CORS allow_origins=['*'] allow_credentials=False")
+# --- Public dashboard security boundary ---
+CLIENT_PUBLIC_PATHS = {"/", "/client-dashboard/login", "/api/tiendanube/oauth/callback"}
+CLIENT_ALLOWED_GET_PATHS = {
+    "/client-dashboard",
+    "/api/client-dashboard/meta",
+    "/api/client-dashboard/creators",
+    "/api/client-dashboard/business",
+}
+CLIENT_ALLOWED_MUTATIONS = {
+    ("POST", "/client-dashboard/logout"),
+    ("PUT", f"/api/accounts/{CLIENT_DASHBOARD_DEFAULT_ACCOUNT}/roas-objetivo"),
+}
+
+
+@app.middleware("http")
+async def secure_public_dashboard(request: Request, call_next):
+    path = request.url.path.rstrip("/") or "/"
+    is_static_asset = path.startswith("/static/client-dashboard/")
+    is_public = path in CLIENT_PUBLIC_PATHS or is_static_asset
+
+    if not is_public and not _client_is_authenticated(request):
+        if path == "/client-dashboard":
+            return RedirectResponse("/client-dashboard/login", status_code=303)
+        return JSONResponse({"detail": "Authentication required"}, status_code=401)
+
+    if not is_public:
+        allowed = (
+            (request.method == "GET" and path in CLIENT_ALLOWED_GET_PATHS)
+            or (request.method, path) in CLIENT_ALLOWED_MUTATIONS
+        )
+        if not allowed:
+            return JSONResponse({"detail": "Not found"}, status_code=404)
+
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; "
+        "script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+    )
+    return response
+
+
+cors_origins = [
+    origin.strip()
+    for origin in os.environ.get(
+        "CLIENT_DASHBOARD_ALLOWED_ORIGINS",
+        "https://dashboard-canela-production.up.railway.app",
+    ).split(",")
+    if origin.strip()
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=cors_origins,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT"],
+    allow_headers=["Content-Type"],
 )
 
 @app.exception_handler(Exception)
@@ -3012,7 +3193,7 @@ async def global_exception_handler(request, exc):
     logger.error(f"GLOBAL ERROR: {str(exc)}")
     return JSONResponse(
         status_code=500,
-        content={"message": "Internal Server Error", "detail": str(exc)},
+        content={"message": "Internal Server Error"},
     )
 
 if __name__ == "__main__":
